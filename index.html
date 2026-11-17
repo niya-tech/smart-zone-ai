@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Smart Zone AI – Factory Digital Twin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#0c0f12;--panel:#151a1f;--line:#26303a;--tx:#d7e0e8;--mu:#7f8d99;--cy:#22d3ee;--g:#34d399;--y:#fbbf24;--r:#f87171;--gr:#5b6670;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--tx);font:13px/1.45 "Barlow","Segoe UI",system-ui,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+h1{font:600 16px "Barlow Condensed","Arial Narrow",sans-serif;margin:0 12px 0 0;letter-spacing:.02em}h1 span{color:var(--cy)}
+button,select,input{background:#1d242b;color:var(--tx);border:1px solid var(--line);border-radius:4px;padding:5px 9px;font:inherit}button{cursor:pointer}button:hover{border-color:var(--cy)}button.on{background:var(--cy);color:#00161a;border-color:var(--cy)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--cy)}
+nav{display:flex;gap:4px;padding:8px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+main{display:grid;grid-template-columns:minmax(300px,520px) 1fr;gap:14px;padding:14px}
+@media(max-width:860px){main{grid-template-columns:1fr}}
+.p{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:12px}.p h2{font:600 13px "Barlow Condensed",sans-serif;margin:0 0 8px;color:var(--cy)}
+.k{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}.k div{background:#10151a;border:1px solid var(--line);padding:6px 8px;border-radius:4px}.k b{display:block;font-size:18px}.k small{color:var(--mu)}
+#wrap{overflow:hidden;border:1px solid var(--line);border-radius:6px;background:#090c0f;touch-action:none}
+svg text{font-family:inherit}.al{border-left:3px solid var(--y);background:#10151a;padding:6px 8px;margin-bottom:6px;border-radius:0 4px 4px 0}.al.red{border-color:var(--r)}.al.done{opacity:.5;border-color:var(--gr)}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0}.row label{color:var(--mu);min-width:120px}
+.sim{color:var(--y);font-size:11px}
+main.home{grid-template-columns:1fr;max-width:1100px;margin:0 auto}main.home>section:first-child{display:none}
+.hero{padding:22px;border:1px solid var(--line);border-radius:6px;background:linear-gradient(135deg,#10181d,#0c0f12);margin-bottom:12px}.hero h2{font:700 36px "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:.06em;margin:0}.hero h3{font-size:15px;font-weight:500;color:var(--cy);margin:2px 0 10px}.hero p{max-width:70ch;margin:0 0 8px}
+.flow{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:12px 0}.chip{border:1px solid var(--line);background:#10151a;border-radius:4px;padding:3px 8px;font-size:12px}.flow i{color:var(--cy);font-style:normal}
+details.p>summary{cursor:pointer;font:600 14px "Barlow Condensed",sans-serif;color:var(--cy)}
+.gd{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:8px;margin-top:10px}.gd>div{background:#10151a;border:1px solid var(--line);border-radius:4px;padding:8px}.gd b{display:flex;gap:8px;align-items:center}.ic{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#22d3ee22;color:var(--cy)}.gd p{margin:4px 0 6px;color:var(--mu)}
+.sw{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.try{display:flex;flex-wrap:wrap;gap:6px;counter-reset:s;margin-top:10px}.try button::before{counter-increment:s;content:counter(s) ". ";color:var(--cy)}.try button.on::before{color:#00161a}
+</style></head><body>
+<header><h1>Smart Zone <span>AI</span> · Factory Digital Twin</h1>
+<button id="bp">Pause</button><button id="br">Reset</button>
+<label>Speed <select id="sp"><option>1</option><option>2</option><option>4</option></select></label>
+<label>Volume <input id="vol" type="range" min="1" max="10" value="5"></label>
+<span class="sim">All observations are simulated, not real CCTV detections.</span></header>
+<nav id="nav"></nav>
+<main><section><div id="wrap"><svg id="svg" viewBox="0 0 480 640" width="100%"></svg></div>
+<div class="p" style="margin-top:8px"><div class="row"><button id="zi">Zoom +</button><button id="zo">Zoom −</button><button id="zr">Fit</button><span style="color:var(--mu)">Drag to pan · click a point or machine</span></div>
+<div id="legend" style="color:var(--mu)">Cyan: one camera · Bright cyan: overlap · Grey hatch: uncovered. Click a camera dot to fail or restore it.</div></div></section>
+<section id="side"></section></main>
+<script>
+const COLS="ABCDEFGHIJKL",C=40,KEY="szai-v1";
+const M0=[["Raw Materials",1,1],["Loading",1,4],["Cutting",4,6],["Assembly",7,6],["Conveyor",9,9],["Quality Inspection",7,12],["Packaging",4,13],["Finished Goods",1,14]];
+const CAM0=[[3,3],[3,9],[8,4],[9,11],[4,14]].map((p,i)=>({id:"CAM"+(i+1),x:p[0],y:p[1],r:4.2,fov:360,ok:true}));
+const ZONE=[10,1,11,3]; // restricted x0,y0,x1,y1
+const inject={"Machine overheating":"temp","Conveyor obstruction":"obs","Missing worker":"miss","PPE violation":"ppe","Unsafe proximity":"prox","Production bottleneck":"bott","Excessive processing time":"slow","Quality defect spike":"def","Camera failure":"cam","Restricted zone violation":"zone"};
+const ACT={temp:["Operating temperature above limit","Reduce speed and inspect coolant; schedule maintenance"],obs:["Conveyor exit condition unmet: product accumulation","Clear obstruction and verify belt sensors"],miss:["Entry condition unmet: no worker present","Assign a worker or reallocate from a lower-load station"],ppe:["Entry condition unmet: PPE compliance below 100%","Stop station entry; issue PPE reminder to the worker"],prox:["Worker inside machine safety envelope","Pause machine and move worker out of the envelope"],bott:["Queue exceeds limit: upstream blocked","Raise downstream speed or add a worker"],slow:["Processing time exceeds expected cycle","Check tooling wear; inspect material batch"],def:["Defect rate above 6%","Recalibrate station and re-inspect last batch"],cam:["Camera offline: coverage reduced","Dispatch technician; confirm neighbouring cameras cover the gap"],zone:["Worker detected in restricted zone","Dispatch supervisor; lock the zone access"]};
+let S,tab="Home",view={z:1,x:0,y:0},sel=null,timer;
+function fresh(){return{t:0,run:true,tp:0,hist:[],base:[],alerts:[],aid:1,opt:{spd:1,workers:3,target:120,cyc:1,conv:1},
+ M:M0.map((m,i)=>({id:i,n:m[0],x:m[1],y:m[2],st:"Running",temp:55+Math.random()*8,hh:[],q:i?0:99,prog:0,out:0,tmax:90,qmax:6,cyc:i==0||i==7?1:4+i%3,flag:null,def:2})),
+ CAM:CAM0.map(c=>({...c})),W:[0,1,2].map(i=>({id:"W"+(i+1),x:3+i*3,y:5+i*2,ppe:true,tx:3+i*3,ty:5+i*2,here:true})),P:[]}}
+function load(){try{const j=JSON.parse(localStorage.getItem(KEY));if(j){j.run=false;return j}}catch(e){}return fresh()}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({...S,P:[]}))}catch(e){}}
+S=load();
+const cell=(x,y)=>COLS[x-1]+y;
+function cov(x,y){return S.CAM.filter(c=>c.ok&&Math.hypot(c.x-x,c.y-y)<=c.r).length}
+function alert(sev,type,m,loc){if(S.alerts.some(a=>a.type==type&&a.loc==loc&&a.st!="resolved"))return;
+ S.alerts.unshift({id:S.aid++,time:new Date().toLocaleTimeString(),sev,type,loc,why:ACT[type][0],fix:ACT[type][1],st:"open"})}
+function tick(){
+ if(!S.run)return;const v=+document.getElementById("vol").value,sp=S.opt.spd,k=+document.getElementById("sp").value;S.t++;
+ const wk=S.opt.workers/3;
+ S.M.forEach((m,i)=>{const f=m.flag;
+  if(m.st=="Maintenance")return;
+  const rate=(i==0?v/10:1)*sp*wk*(i==4?S.opt.conv:1)*(f=="slow"?.3:1)/(m.cyc*S.opt.cyc*10);
+  const nxt=S.M[i+1],blocked=nxt&&nxt.q>m.qmax*2||f=="obs";
+  if(m.q>0&&!blocked&&m.st!="Fault"&&f!="miss"){m.prog+=rate*k;if(m.prog>=1){m.prog=0;if(i)m.q--;m.out++;if(nxt)nxt.q+=(i<7?1:0);if(i==7)S.tp++;if(i<7)S.P.push({a:i,t:0})}}
+  const target=45+sp*12*(m.q>0?1:.3)+(f=="temp"?55:0);m.temp+=(target-m.temp)*.04*k+(Math.random()-.5);
+  m.hh.push(m.temp);if(m.hh.length>40)m.hh.shift();
+  m.def=f=="def"?12:2+(sp>1.3?sp-1.3:0)*3;
+  m.st=m.temp>m.tmax+5?"Fault":m.temp>m.tmax?"Warning":m.q==0?"Idle":"Running";if(f=="miss"&&m.st=="Running")m.st="Idle";
+  const loc=cell(m.x,m.y);
+  if(m.st=="Fault")alert("critical","temp","",loc);else if(m.st=="Warning")alert("warning","temp","",loc);
+  if(m.q>m.qmax&&i>0&&i<7)alert("warning","bott","",loc);
+  if(f=="obs")alert("critical","obs","",loc);if(f=="miss")alert("warning","miss","",loc);if(f=="ppe")alert("critical","ppe","",loc);
+  if(f=="slow")alert("warning","slow","",loc);if(f=="def"||m.def>6)alert("warning","def","",loc);if(f=="prox")alert("critical","prox","",loc);
+ });
+ S.P.forEach(p=>p.t+=.08*k*sp);S.P=S.P.filter(p=>p.t<1);
+ S.W.forEach(w=>{if(Math.random()<.02){w.tx=Math.max(1,Math.min(12,w.x+Math.round(Math.random()*4-2)));w.ty=Math.max(1,Math.min(16,w.y+Math.round(Math.random()*4-2)))}
+  w.x+=(w.tx-w.x)*.1;w.y+=(w.ty-w.y)*.1;
+  if(w.x>=ZONE[0]&&w.x<=ZONE[2]&&w.y>=ZONE[1]&&w.y<=ZONE[3])alert("critical","zone","",cell(Math.round(w.x),Math.round(w.y)))});
+ S.CAM.forEach(c=>{if(!c.ok)alert("warning","cam","",c.id+" @ "+cell(c.x,c.y))});
+ if(S.t%5==0){S.hist.push(S.tp);if(S.hist.length>60)S.hist.shift()}
+ if(S.t%10==0)save();
+ draw();
+}
+function color(m){return{Running:"var(--g)",Idle:"var(--y)",Warning:"var(--y)",Fault:"var(--r)",Maintenance:"var(--gr)"}[m.st]}
+function cellStatus(x,y){const loc=cell(x,y);const a=S.alerts.find(a=>a.loc==loc&&a.st!="resolved");if(a)return a.sev=="critical"?"var(--r)":"var(--y)";return cov(x,y)?"var(--g)":"var(--gr)"}
+function drawTwin(){let h=`<g transform="translate(${view.x} ${view.y}) scale(${view.z})"><rect width="480" height="640" fill="#0a0d10"/>`;
+ h+=`<rect x="${(ZONE[0]-1)*C}" y="${(ZONE[1]-1)*C}" width="${(ZONE[2]-ZONE[0]+1)*C}" height="${(ZONE[3]-ZONE[1]+1)*C}" fill="#f8717122" stroke="var(--r)" stroke-dasharray="4"/><text x="${(ZONE[0]-1)*C+4}" y="${(ZONE[1]-1)*C+14}" fill="var(--r)" font-size="10">Restricted</text>`;
+ for(let x=1;x<=12;x++)for(let y=1;y<=16;y++){const n=cov(x,y);const fill=n>1?"#22d3ee38":n==1?"#22d3ee14":"#5b667022";const st=cellStatus(x,y);
+  h+=`<rect data-c="${x},${y}" x="${(x-1)*C}" y="${(y-1)*C}" width="${C}" height="${C}" fill="${fill}" stroke="${sel&&sel.k=="c"&&sel.x==x&&sel.y==y?"#fff":"#26303a"}"/><circle cx="${(x-1)*C+C-6}" cy="${(y-1)*C+6}" r="2.5" fill="${st}"/>`;
+  if(!n)h+=`<path d="M${(x-1)*C} ${y*C}l${C} ${-C}" stroke="#5b6670" stroke-opacity=".3"/>`}
+ for(let x=1;x<=12;x++)h+=`<text x="${(x-1)*C+16}" y="10" fill="#7f8d99" font-size="9">${COLS[x-1]}</text>`;
+ for(let y=1;y<=16;y++)h+=`<text x="1" y="${(y-1)*C+22}" fill="#7f8d99" font-size="9">${y}</text>`;
+ const ctr=m=>[(m.x-.5)*C,(m.y-.5)*C];
+ S.M.forEach((m,i)=>{if(i<7){const a=ctr(m),b=ctr(S.M[i+1]);h+=`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#22d3ee55" stroke-width="3" stroke-dasharray="6 4"/>`}});
+ S.P.forEach(p=>{const a=ctr(S.M[p.a]),b=ctr(S.M[p.a+1]);h+=`<circle cx="${a[0]+(b[0]-a[0])*p.t}" cy="${a[1]+(b[1]-a[1])*p.t}" r="4" fill="#22d3ee"/>`});
+ S.M.forEach(m=>{const c=ctr(m);h+=`<g data-m="${m.id}" style="cursor:pointer"><rect x="${c[0]-30}" y="${c[1]-15}" width="60" height="30" rx="3" fill="#151a1f" stroke="${color(m)}" stroke-width="${sel&&sel.k=="m"&&sel.id==m.id?3:1.5}"/><text x="${c[0]}" y="${c[1]-2}" text-anchor="middle" fill="#d7e0e8" font-size="8">${m.n}</text><text x="${c[0]}" y="${c[1]+9}" text-anchor="middle" fill="${color(m)}" font-size="8">${m.st} ${m.temp.toFixed(0)}°</text></g>`});
+ S.W.forEach(w=>{h+=`<circle cx="${(w.x-.5)*C}" cy="${(w.y-.5)*C}" r="5" fill="#fff" stroke="${w.ppe?"var(--g)":"var(--r)"}" stroke-width="2"/>`});
+ S.CAM.forEach(c=>{const x=(c.x-.5)*C,y=(c.y-.5)*C;h+=`<g data-cam="${c.id}" style="cursor:pointer"><circle cx="${x}" cy="${y}" r="${c.r*C}" fill="none" stroke="${c.ok?"#22d3ee":"#f87171"}" stroke-opacity=".35" stroke-dasharray="3 3"/><circle cx="${x}" cy="${y}" r="7" fill="${c.ok?"#22d3ee":"#f87171"}"/><text x="${x+9}" y="${y+3}" fill="#22d3ee" font-size="8">${c.id}</text></g>`});
+ document.getElementById("svg").innerHTML=h+"</g>"}
+function slope(a){const n=a.length;if(n<5)return 0;let sx=0,sy=0,sxy=0,sxx=0;a.forEach((y,x)=>{sx+=x;sy+=y;sxy+=x*y;sxx+=x*x});return(n*sxy-sx*sy)/(n*sxx-sx*sx||1)}
+function spark(a,w=200,h=40){if(a.length<2)return"";const mx=Math.max(...a),mn=Math.min(...a),r=mx-mn||1;return`<svg width="${w}" height="${h}"><polyline fill="none" stroke="#22d3ee" stroke-width="1.5" points="${a.map((v,i)=>(i/(a.length-1)*w)+","+(h-(v-mn)/r*(h-4)-2)).join(" ")}"/></svg>`}
+const rate=()=>{const a=S.hist;return a.length<2?0:(a[a.length-1]-a[Math.max(0,a.length-7)])/Math.min(6,a.length-1)*12*(1)};
+function panel(){if(tab=="Home")return home();const open=S.alerts.filter(a=>a.st!="resolved"),n=S.CAM.length*0;
+ let tot=12*16,cv=0,ov=0;for(let x=1;x<=12;x++)for(let y=1;y<=16;y++){const c=cov(x,y);if(c)cv++;if(c>1)ov++}
+ const util=Math.round(S.M.filter(m=>m.st=="Running").length/8*100),ppe=Math.round(S.W.filter(w=>w.ppe).length/S.W.length*100);
+ const kp=`<div class="k"><div><b>${S.tp}</b><small>Finished / target ${S.opt.target}</small></div><div><b>${util}%</b><small>Machine utilisation</small></div><div><b>${ppe}%</b><small>PPE compliance</small></div><div><b>${open.length}</b><small>Open alerts</small></div><div><b>${Math.round(cv/tot*100)}%</b><small>Camera coverage (${ov} overlap)</small></div></div>`;
+ let h="";
+ if(tab=="Digital Twin"||tab=="Overview"){h+=`<div class="p"><h2>Overview</h2>${kp}<div style="margin-top:8px">Throughput ${spark(S.hist)}</div></div>`}
+ if(tab=="Digital Twin"){
+  h+=`<div class="p"><h2>Selection</h2>${selHtml()}</div>`;
+  h+=`<div class="p"><h2>Inject anomaly (simulated)</h2><div class="row">${Object.keys(inject).map(k=>`<button data-inj="${k}">${k}</button>`).join("")}</div></div>`}
+ if(tab=="Machines"){h+=S.M.map(m=>{const s=slope(m.hh.slice(-20)),eta=s>.05?Math.max(0,((m.tmax-m.temp)/s)).toFixed(0)+" ticks to limit":"stable";return`<div class="p"><h2>${m.n} · ${cell(m.x,m.y)}</h2><div class="k"><div><b style="color:${color(m)}">${m.st}</b><small>State</small></div><div><b>${m.temp.toFixed(1)}°C</b><small>Temperature</small></div><div><b>${m.out}</b><small>Output</small></div><div><b>${m.q>90?"–":m.q}</b><small>Queue</small></div><div><b>${eta}</b><small>Failure risk trend</small></div></div>${spark(m.hh,300,30)}<div class="row"><button data-maint="${m.id}">${m.st=="Maintenance"?"End maintenance":"Maintenance"}</button></div></div>`}).join("")}
+ if(tab=="Safety"){h+=`<div class="p"><h2>Safety</h2>${S.W.map(w=>`<div class="row"><label>${w.id} at ${cell(Math.round(w.x),Math.round(w.y))}</label><span style="color:${w.ppe?"var(--g)":"var(--r)"}">PPE ${w.ppe?"compliant":"violation"}</span><button data-ppe="${w.id}">Toggle PPE</button></div>`).join("")}<div class="sim">Restricted zone: J1–K3. Violations raise alerts automatically.</div></div>`}
+ if(tab=="Conditions"){const m=S.M[sel&&sel.k=="m"?sel.id:2];h+=`<div class="p"><h2>Conditions · ${m.n}</h2><div class="row"><select id="cm">${S.M.map(x=>`<option value="${x.id}" ${x.id==m.id?"selected":""}>${x.n}</option>`).join("")}</select></div><div class="row"><label>Entry</label>Material in queue ≥ 1 · worker present · PPE compliant</div><div class="row"><label>Operating: max temp °C</label><input data-ed="tmax:${m.id}" type="number" value="${m.tmax}"></div><div class="row"><label>Operating: cycle time</label><input data-ed="cyc:${m.id}" type="number" value="${m.cyc}"></div><div class="row"><label>Exit: max queue downstream</label><input data-ed="qmax:${m.id}" type="number" value="${m.qmax}"></div><div class="sim">Edits apply to the running simulation and are saved.</div></div>`}
+ if(tab=="Alerts"){h+=`<div class="p"><h2>AI alerts</h2>${S.alerts.length?S.alerts.map(a=>`<div class="al ${a.sev=="critical"?"red":""} ${a.st=="resolved"?"done":""}"><b>${a.time} · ${a.sev} · ${a.loc}</b> (${a.st})<br>Violated: ${a.why}<br>Action: ${a.fix}<div class="row"><button data-ack="${a.id}">Acknowledge</button><button data-res="${a.id}">Resolve</button></div></div>`).join(""):"No alerts yet. Run the simulation or inject an anomaly."}</div>`}
+ if(tab=="Optimisation"){const b=S.base.length?S.base:null,cur=rate();h+=`<div class="p"><h2>Optimise</h2>${[["spd","Machine speed",.5,2,.1],["conv","Conveyor speed",.5,2,.1],["workers","Workers",1,6,1],["cyc","Processing time ×",.5,1.5,.1],["target","Target",20,300,10]].map(o=>`<div class="row"><label>${o[1]}</label><input type="range" data-opt="${o[0]}" min="${o[2]}" max="${o[3]}" step="${o[4]}" value="${S.opt[o[0]]}"> ${S.opt[o[0]]}</div>`).join("")}<div class="row"><button id="setbase">Set current as baseline</button></div><div class="k"><div><b>${b?b[0].toFixed(1):"–"}</b><small>Baseline units/min</small></div><div><b>${cur.toFixed(1)}</b><small>Current units/min</small></div><div><b>${S.M.reduce((a,m)=>Math.max(a,m.q<90?m.q:0),0)}</b><small>Largest queue</small></div></div></div>`}
+ if(tab=="Predictive"){const t=S.M.map(m=>({n:m.n,s:slope(m.hh.slice(-25)),q:slope([].concat(m.hh.slice(-3)))}));h+=`<div class="p"><h2>Forecasts (linear trend of last 25 samples)</h2>${S.M.map(m=>{const s=slope(m.hh.slice(-25)),risk=Math.min(100,Math.max(0,Math.round((m.temp-55)/(m.tmax-55)*100+s*20)));return`<div class="row"><label>${m.n}</label><div style="flex:1;background:#10151a;height:8px;border-radius:4px"><div style="width:${risk}%;height:8px;border-radius:4px;background:${risk>75?"var(--r)":risk>50?"var(--y)":"var(--g)"}"></div></div>${risk}% fail risk</div>`}).join("")}<div class="sim">Congestion and defect risk rise with queue length and defect rate.</div></div>`}
+ return h}
+function home(){
+ const G=[["▦","Factory overview","Understand the 12 × 16 grid, machine positions, production flow, workers and restricted zones.","Digital Twin"],["◔","Monitor operations","Observe machine status, throughput, utilisation and operating conditions.","Machines"],["◉","Camera & safety monitoring","Explore camera coverage, blind spots, PPE compliance and safety violations.","Safety"],["⚠","Inject anomalies","Simulate machine failures, overheating, conveyor obstructions and other disruptions to observe system responses.","Digital Twin"],["∿","Analyse performance","Use trends and forecasts to identify bottlenecks, downtime and production inefficiencies.","Predictive"],["⚙","Optimise production","Adjust machine speeds, worker allocation and operating parameters to improve factory performance.","Optimisation"],["⇄","Compare results","Evaluate baseline and optimised performance using throughput and queue KPIs.","Optimisation"]];
+ const T=[["Start the simulation","go"],["Select a machine","pick"],["Adjust its operating parameters","Conditions"],["Inject an anomaly","Digital Twin"],["Open analytics","Predictive"],["Run optimisation and compare","Optimisation"]];
+ const L=[["var(--g)","Green","Operational or normal: machine Running, grid point covered and clear."],["var(--y)","Yellow","Warning or attention required: machine Idle or Warning, open warning alert."],["var(--r)","Red","Critical: machine Fault, safety alert, restricted zone, camera offline."],["var(--cy)","Blue","Active production or movement: products in transit, conveyor flow, camera coverage."],["var(--gr)","Grey","Inactive or unavailable: machine in Maintenance, grid point with no camera coverage."]];
+ const bt=(k,l)=>k=="go"?`<button class="on" data-go="1">${l}</button>`:k=="pick"?`<button data-pick="1">${l}</button>`:`<button data-tab="${k}">${l}</button>`;
+ return `<div class="hero"><h2>SMART ZONE AI</h2><h3>Intelligent Factory Monitoring &amp; Optimisation System</h3><p>Smart Zone AI is an interactive factory digital twin designed to simulate industrial operations, monitor machine performance, identify production bottlenecks, detect safety anomalies and evaluate optimisation strategies. It combines real-time simulated factory monitoring with predictive analytics to demonstrate how intelligent systems can improve manufacturing efficiency, operational safety and resource utilisation.</p><div class="flow">${S.M.map(m=>`<span class="chip">${m.n}</span>`).join("<i>›</i>")}</div><div class="row"><button class="on" data-go="1">Launch live factory simulation</button><span class="sim">Opens the digital twin and starts the simulation.</span></div></div>
+ <details open class="p"><summary>Try the simulation</summary><div class="try">${T.map(t=>bt(t[1],t[0])).join("")}</div></details>
+ <details open class="p"><summary>Getting started guide</summary><div class="gd">${G.map(g=>`<div><b><span class="ic">${g[0]}</span>${g[1]}</b><p>${g[2]}</p><button data-tab="${g[3]}">Open ${g[3]}</button></div>`).join("")}</div></details>
+ <details open class="p"><summary>Dashboard legend</summary><div class="gd">${L.map(l=>`<div><b><span class="sw" style="background:${l[0]}"></span>${l[1]}</b><p>${l[2]}</p></div>`).join("")}</div></details>
+ <div class="sim">This application is a simulated factory environment for demonstration and educational purposes. Machine readings, camera feeds, alerts and predictive outputs are simulated.</div>`}
+function selHtml(){if(!sel)return"Select a grid point or machine.";
+ if(sel.k=="m"){const m=S.M[sel.id];return`<b>${m.n}</b> at ${cell(m.x,m.y)}<br>Expected: temp ≤ ${m.tmax}°C, queue ≤ ${m.qmax}<br>Observed (simulated): ${m.temp.toFixed(1)}°C, queue ${m.q>90?"–":m.q}, ${m.st}`}
+ const x=sel.x,y=sel.y,m=S.M.find(m=>m.x==x&&m.y==y),cams=S.CAM.filter(c=>c.ok&&Math.hypot(c.x-x,c.y-y)<=c.r).map(c=>c.id);
+ return`<b>${cell(x,y)}</b> · X ${x} · Y ${y} · Z ${(1.2).toFixed(1)}m<br>Machine: ${m?m.n:"none"} · Camera: ${cams.join(", ")||"none (blind spot)"}<br>Expected: normal occupancy and temperature<br>Observed (simulated): ${m?m.st:"clear"} · Status ${cams.length?"monitored":"unmonitored"}`}
+let lastTab="";function draw(){document.querySelector("main").className=tab=="Home"?"home":"";if(tab!="Home")drawTwin();if(tab!="Home"||lastTab!="Home")document.getElementById("side").innerHTML=panel();lastTab=tab;document.getElementById("nav").innerHTML=["Home","Digital Twin","Overview","Machines","Safety","Conditions","Alerts","Predictive","Optimisation"].map(t=>`<button class="${t==tab?"on":""}" data-tab="${t}">${t}</button>`).join("")}
+document.addEventListener("click",e=>{const t=e.target,d=t.closest("[data-tab],[data-inj],[data-maint],[data-ppe],[data-ack],[data-res],[data-m],[data-cam],[data-c],[data-go],[data-pick]");
+ if(t.id=="bp"){S.run=!S.run;t.textContent=S.run?"Pause":"Resume"}
+ else if(t.id=="br"){S=fresh();try{localStorage.removeItem(KEY)}catch(x){}sel=null;document.getElementById("bp").textContent="Pause"}
+ else if(t.id=="zi")view.z=Math.min(3,view.z*1.2);else if(t.id=="zo")view.z=Math.max(.6,view.z/1.2);else if(t.id=="zr")view={z:1,x:0,y:0};
+ else if(t.id=="setbase")S.base=[rate()];
+ else if(d){const a=d.dataset;
+  if(a.tab)tab=a.tab;
+  else if(a.go){tab="Digital Twin";S.run=true;document.getElementById("bp").textContent="Pause"}
+  else if(a.pick){tab="Digital Twin";sel={k:"m",id:2}}
+  else if(a.inj){const k=inject[a.inj],m=S.M[2+Math.floor(Math.random()*5)];
+   if(k=="cam"){const c=S.CAM[Math.floor(Math.random()*5)];c.ok=false;alert("warning","cam","",c.id+" @ "+cell(c.x,c.y))}
+   else if(k=="zone"){const w=S.W[0];w.x=w.tx=11;w.y=w.ty=2}
+   else if(k=="ppe"){S.W[0].ppe=false;m.flag="ppe"}
+   else if(k=="bott"){m.q+=8;alert("warning","bott","",cell(m.x,m.y))}
+   else{m.flag=k;setTimeout(()=>{if(m.flag==k)m.flag=null},20000)}
+   sel={k:"m",id:m.id}}
+  else if(a.maint){const m=S.M[a.maint];m.st=m.st=="Maintenance"?"Idle":"Maintenance";m.temp=m.st=="Maintenance"?50:m.temp;m.flag=null}
+  else if(a.ppe){const w=S.W.find(w=>w.id==a.ppe);w.ppe=!w.ppe}
+  else if(a.ack){S.alerts.find(x=>x.id==a.ack).st="acknowledged"}
+  else if(a.res){const x=S.alerts.find(x=>x.id==a.res);x.st="resolved";S.M.forEach(m=>{if(cell(m.x,m.y)==x.loc){m.flag=null;if(x.type=="temp")m.temp=60}});if(x.type=="ppe")S.W.forEach(w=>w.ppe=true);if(x.type=="cam")S.CAM.forEach(c=>{if(x.loc.startsWith(c.id))c.ok=true})}
+  else if(a.cam){const c=S.CAM.find(c=>c.id==a.cam);c.ok=!c.ok;if(!c.ok)alert("warning","cam","",c.id+" @ "+cell(c.x,c.y))}
+  else if(a.m)sel={k:"m",id:+a.m};else if(a.c){const p=a.c.split(",");sel={k:"c",x:+p[0],y:+p[1]}}}
+ save();draw()});
+document.addEventListener("input",e=>{const t=e.target;if(t.dataset.opt){S.opt[t.dataset.opt]=+t.value;save();document.getElementById("side").innerHTML=panel()}
+ if(t.dataset.ed){const p=t.dataset.ed.split(":");S.M[+p[1]][p[0]]=+t.value;save()}});
+document.addEventListener("change",e=>{if(e.target.id=="cm"){sel={k:"m",id:+e.target.value};draw()}});
+let dr=null;const wr=document.getElementById("wrap");
+wr.addEventListener("pointerdown",e=>dr={x:e.clientX-view.x,y:e.clientY-view.y,m:false});
+window.addEventListener("pointermove",e=>{if(dr&&e.buttons){view.x=e.clientX-dr.x;view.y=e.clientY-dr.y;dr.m=true;drawTwin()}});
+window.addEventListener("pointerup",()=>dr=null);
+setInterval(tick,200);draw();
+</script></body></html>
