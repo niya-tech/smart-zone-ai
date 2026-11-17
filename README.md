@@ -142,7 +142,7 @@ These limitations define the current prototype scope and provide opportunities f
 
 ## Project Information
 
-**Project:** Smart Zone AI – Intelligent Factory Monitoring & Optimisation System
+**Project:** Smart Zone AI (Intelligent Factory Monitoring & Optimisation System)
 
 **Category:** Industrial Technology | Digital Twin | Factory Simulation | Operational Optimisation
 
